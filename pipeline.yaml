@@ -22,8 +22,8 @@ spec:
 
         stage("Set Project Names") {
           def userInput = input(
-          id: 'userInput', message: 'Please Set Project Names', parameters: [
-              [$class: 'TextParameterDefinition', defaultValue: 'username', description: 'Username', name: 'USERNAME']
+          id: 'userInput', message: 'Please set the Username part of your project names (e.g. development-<username>)', parameters: [
+              [$class: 'TextParameterDefinition', defaultValue: 'username', description: 'Username', name: 'username']
           ])
 
           devProjectName += userInput
