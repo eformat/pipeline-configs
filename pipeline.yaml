@@ -15,31 +15,91 @@ spec:
     type: None
   strategy:
     jenkinsPipelineStrategy:
-      jenkinsfile: "node('maven') {\n  stage 'build & deploy in dev'\n  openshiftBuild(namespace:
-        'development',\n  \t\t\t    buildConfig: 'myapp',\n\t\t\t    showBuildLogs:
-        'true',\n\t\t\t    waitTime: '3000000')\n  \n  stage 'verify deploy in dev'\n
-        \ openshiftVerifyDeployment(namespace: 'development',\n\t\t\t\t       depCfg:
-        'myapp',\n\t\t\t\t       replicaCount:'1',\n\t\t\t\t       verifyReplicaCount:
-        'true',\n\t\t\t\t       waitTime: '300000')\n  \n  stage 'deploy in test'\n
-        \ openshiftTag(namespace: 'development',\n  \t\t\t  sourceStream: 'myapp',\n\t\t\t
-        \ sourceTag: 'latest',\n\t\t\t  destinationStream: 'myapp',\n\t\t\t  destinationTag:
-        'promoteQA')\n  \n  openshiftDeploy(namespace: 'testing',\n  \t\t\t     deploymentConfig:
-        'myapp',\n\t\t\t     waitTime: '300000')\n\n  openshiftScale(namespace: 'testing',\n
-        \ \t\t\t     deploymentConfig: 'myapp',\n\t\t\t     waitTime: '300000',\n\t\t\t
-        \    replicaCount: '2')\n  \n  stage 'verify deploy in test'\n  openshiftVerifyDeployment(namespace:
-        'testing',\n\t\t\t\t       depCfg: 'myapp',\n\t\t\t\t       replicaCount:'2',\n\t\t\t\t
-        \      verifyReplicaCount: 'true',\n\t\t\t\t       waitTime: '300000')\n  \n
-        \ stage 'Deploy to production'\n  timeout(time: 2, unit: 'DAYS') {\n      input
-        message: 'Approve to production?'\n }\n\n  openshiftTag(namespace:
-        'development',\n  \t\t\t  sourceStream: 'myapp',\n\t\t\t  sourceTag: 'promoteQA',\n\t\t\t
-        \ destinationStream: 'myapp',\n\t\t\t  destinationTag: 'promotePRD')\n\n  \n
-        \ openshiftDeploy(namespace: 'production',\n  \t\t\t     deploymentConfig:
-        'myapp',\n\t\t\t     waitTime: '300000')\n  \n  openshiftScale(namespace:
-        'production',\n  \t\t\t     deploymentConfig: 'myapp',\n\t\t\t     waitTime:
-        '300000',\n\t\t\t     replicaCount: '2')\n  \n  stage 'verify deploy in production'\n
-        \ openshiftVerifyDeployment(namespace: 'production',\n\t\t\t\t       depCfg:
-        'myapp',\n\t\t\t\t       replicaCount:'2',\n\t\t\t\t       verifyReplicaCount:
-        'true',\n\t\t\t\t       waitTime: '300000')\n}"
+      jenkinsfile: |
+        def devProjectName = "development-"
+        def testProjectName = "testing-"
+        def prodProjectName = "production-"
+
+        stage("Set Project Names") {
+          def userInput = input(
+          id: 'userInput', message: 'Please Set Project Names', parameters: [
+              [$class: 'TextParameterDefinition', defaultValue: 'username', description: 'Username', name: 'USERNAME']
+          ])
+
+          devProjectName += userInput
+          testProjectName += userInput
+          prodProjectName += userInput
+
+          echo ("Development Project: "+devProjectName)
+          echo ("Testing Project: "+testProjectName)
+          echo ("Production Project: "+prodProjectName)
+        }
+
+        node('maven') {
+
+          stage 'build & deploy in dev'
+          openshiftBuild(namespace: devProjectName,
+                  buildConfig: 'myapp',
+                  showBuildLogs: 'true',
+                  waitTime: '3000000')
+
+          stage 'verify deploy in dev'
+          openshiftVerifyDeployment(namespace: devProjectName,
+                  depCfg: 'myapp',
+                  replicaCount:'1',
+                  verifyReplicaCount: 'true',
+                  waitTime: '300000')
+
+          stage 'deploy in test'
+          openshiftTag(namespace: devProjectName,
+                  sourceStream: 'myapp',
+                  sourceTag: 'latest',
+                  destinationStream: 'myapp',
+                  destinationTag: 'promoteQA')
+
+          openshiftDeploy(namespace: testProjectName,
+                  deploymentConfig: 'myapp',
+                  waitTime: '300000')
+
+          openshiftScale(namespace: testProjectName,
+                  deploymentConfig: 'myapp',
+                  waitTime: '300000',
+                  replicaCount: '2')
+
+          stage 'verify deploy in test'
+          openshiftVerifyDeployment(namespace: testProjectName,
+                  depCfg: 'myapp',
+                  replicaCount:'2',
+                  verifyReplicaCount: 'true',
+                  waitTime: '300000')
+
+          stage 'Deploy to production'
+          timeout(time: 2, unit: 'DAYS') {
+                  input message: 'Approve to production?'
+          }
+
+          openshiftTag(namespace: devProjectName,
+                  sourceStream: 'myapp',
+                  sourceTag: 'promoteQA',
+                  destinationStream: 'myapp',
+                  destinationTag: 'promotePRD')
+
+          openshiftDeploy(namespace: prodProjectName,
+                  deploymentConfig: 'myapp',
+                  waitTime: '300000')
+
+          openshiftScale(namespace: prodProjectName,
+                  deploymentConfig: 'myapp',
+                  waitTime: '300000',
+                  replicaCount: '2')
+
+          stage 'verify deploy in production'
+          openshiftVerifyDeployment(namespace: prodProjectName,
+                  depCfg: 'myapp',
+                  replicaCount:'2',
+                  verifyReplicaCount: 'true',
+                  waitTime: '300000')
+        }
     type: JenkinsPipeline
   triggers:
   - github:
